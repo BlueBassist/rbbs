@@ -13,31 +13,31 @@ require 'mash'
 
 
 
-
+  
+class String
+  include Term::ANSIColor
+end
 
 module RBBS
-  
-  class String
-    include Term::ANSIColor
-  end
+    
   
   def post_init
-    @server_config = YAML::load_file( '../rbbs-config.yml' )
-    puts @server_config.inspect
+    @server_config = Mash.new(YAML::load_file( '../config/rbbs-config.yml' ))
     @next_line = "\r\n"
     @session_info = {:current_menu => 'Main'}
-    @prompt = "\r\n#{@server_config['name']} - #{@session_info[:current_menu]}[h,q,m,t,d]: ".bold 
-    send_data build_menu
+    @prompt = "\r\n#{@server_config.name} - #{@session_info[:current_menu]}[h,q,m,t,d]: ".bold 
+    send_data build_menu('main')
     send_data @prompt
     @connect_time = Time.now
   end
-  
+
+      
   def receive_data data
     case data
     when /^(\?|h|help)/i
       option = "Your available options are:"
     when /^(q|quit)/i
-      send_data "Thanks for visiting #{@server_config['name']}"
+      send_data "Thanks for visiting #{@server_config.name}"
       close_connection
     when /^(m|menu)/i
       option = build_menu
@@ -56,18 +56,47 @@ module RBBS
     # close_connection if data =~ /quit/i
   end
   
-  def build_menu
-    menu = @server_config['name']
-    menu += @next_line
-    20.times { menu += '-' }
-    menu += @next_line
-    menu += ' You are connected to TheDragon'
-    menu += @next_line
-    20.times { menu += '-' }
-    menu
+  # def build_menu(section)
+  #   menu_items = YAML::load_file("../config/#{section}-menu.yaml").to_a
+  #   menu = @server_config.name
+  #   menu_line
+  #   # puts menu_items.inspect
+  #   menu_items.each do |row|
+  #     puts row.last[1].inspect
+  #     row = row.last.to_a
+  #     puts row.inspect
+  #     # line = Mash.new({:a => item.[1], :b => item.[3]})
+  #     # puts line.inspect
+  #     # menu_line(line)
+  #   end
+  #   menu_line
+  # end
+  
+  def menu_line(text_col = {})
+    line = ''
+    if text_col.empty?
+      @server_config.screenwidth.times do
+        line += '-'
+      end
+    else
+      whitespace = (@server_config.screenwidth - text_col.a.length - text_col.b.length)/3
+      line += '|'
+      whitespace.times do
+        line += ' '
+      end
+      line += text_col.a
+      whitespace.times do
+        line += ' '
+      end
+      line += text_col.b
+      whitespace.times do
+        line += ' '
+      end
+      line += '|'
+    end
+    return line
   end
 end
-
 EventMachine::run do
-  EventMachine::start_server @server_config['ip'], @server_config['port'], RBBS
+  EventMachine::start_server '0.0.0.0', 8080, RBBS
 end
